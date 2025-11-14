@@ -1,0 +1,645 @@
+import 'package:flutter/material.dart';
+
+void main() => runApp(const CodingApp());
+
+class CodingApp extends StatelessWidget {
+  const CodingApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: "Programming Tutorials",
+      // Use named routes (Exercise 5)
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const TutorialPage(),
+        '/emi': (context) => const EMICalculator(),
+        '/expense': (context) => const ExpenseFormPage(),
+        '/expenseResult': (context) => const ExpenseResultPage(),
+      },
+    );
+  }
+}
+
+/// --------------------
+/// Tutorial list screen
+/// --------------------
+class Tutorial {
+  final String title;
+  final String language;
+  final int id;
+
+  const Tutorial({required this.title, required this.language, required this.id});
+}
+
+final List<Tutorial> tutorials = const [
+  Tutorial(title: "Intro to Dart", language: "Dart", id: 101),
+  Tutorial(title: "Variables in Dart", language: "Dart", id: 102),
+  Tutorial(title: "Loops in Dart", language: "Dart", id: 103),
+  Tutorial(title: "Intro to Python", language: "Python", id: 201),
+  Tutorial(title: "Functions in Python", language: "Python", id: 202),
+  Tutorial(title: "Intro to C", language: "C", id: 301),
+  Tutorial(title: "Pointers in C", language: "C", id: 302),
+];
+
+class TutorialPage extends StatelessWidget {
+  const TutorialPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Programming Tutorials"),
+        backgroundColor: Colors.indigo,
+      ),
+      body: ListView.builder(
+        itemCount: tutorials.length,
+        itemBuilder: (context, index) {
+          final tutorial = tutorials[index];
+          return Column(
+            children: [
+              ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: Colors.indigo.shade100,
+                  child: Text(
+                    tutorial.language[0],
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                title: Text(
+                  tutorial.title,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text("ID: ${tutorial.id}"),
+                trailing: Text(
+                  tutorial.language,
+                  style: const TextStyle(color: Colors.grey),
+                ),
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text("Selected: ${tutorial.title}"),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                },
+                onLongPress: () {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text("Tutorial Selected"),
+                      content: Text("You tapped on: ${tutorial.title}"),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text("OK"),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              const Divider(),
+            ],
+          );
+        },
+      ),
+      // Two FABs stacked: EMI and Expense (named routes)
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton.extended(
+            heroTag: 'emi_btn',
+            onPressed: () => Navigator.pushNamed(context, '/emi'),
+            label: const Text('EMI Calculator'),
+            icon: const Icon(Icons.calculate),
+            backgroundColor: Colors.indigo,
+          ),
+          const SizedBox(height: 12),
+          FloatingActionButton.extended(
+            heroTag: 'expense_btn',
+            onPressed: () => Navigator.pushNamed(context, '/expense'),
+            label: const Text('Expense Manager'),
+            icon: const Icon(Icons.account_balance_wallet),
+            backgroundColor: Colors.green.shade700,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// --------------------------
+/// EMI Calculator (Stateful)
+/// --------------------------
+class EMICalculator extends StatefulWidget {
+  const EMICalculator({super.key});
+
+  @override
+  State<EMICalculator> createState() => _EMICalculatorState();
+}
+
+class _EMICalculatorState extends State<EMICalculator> {
+  final _formKey = GlobalKey<FormState>();
+
+  final TextEditingController _loanController = TextEditingController();
+  final TextEditingController _annualRateController = TextEditingController();
+  final TextEditingController _tenureController = TextEditingController();
+
+  double? _emi;
+  double? _totalInterest;
+
+  @override
+  void dispose() {
+    _loanController.dispose();
+    _annualRateController.dispose();
+    _tenureController.dispose();
+    super.dispose();
+  }
+
+  void _calculateEMI() {
+    if (!_formKey.currentState!.validate()) return;
+
+    final double principal = double.parse(_loanController.text.trim());
+    final double annualRate = double.parse(_annualRateController.text.trim());
+    final int months = int.parse(_tenureController.text.trim());
+
+    final double r = annualRate / 12.0 / 100.0;
+
+    double emi;
+    if (r == 0) {
+      emi = principal / months;
+    } else {
+      final double powFactor = (1 + r).pow(months);
+      emi = principal * r * powFactor / (powFactor - 1);
+    }
+
+    final double totalPayment = emi * months;
+    final double totalInterest = totalPayment - principal;
+
+    setState(() {
+      _emi = emi;
+      _totalInterest = totalInterest;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("EMI Calculator"),
+        backgroundColor: Colors.indigo,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              // Loan Amount
+              TextFormField(
+                controller: _loanController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Loan Amount (P)',
+                  hintText: 'Enter loan amount (e.g., 500000)',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Loan amount is required';
+                  }
+                  final v = double.tryParse(value.trim());
+                  if (v == null || v <= 0) {
+                    return 'Enter a valid positive number';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+
+              // Annual Interest Rate %
+              TextFormField(
+                controller: _annualRateController,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Annual Interest Rate (%)',
+                  hintText: 'Enter annual rate (e.g., 7.5)',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Interest rate is required';
+                  }
+                  final v = double.tryParse(value.trim());
+                  if (v == null || v < 0) {
+                    return 'Enter a valid non-negative number';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+
+              // Tenure in months
+              TextFormField(
+                controller: _tenureController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Loan Tenure (months)',
+                  hintText: 'Enter tenure in months (e.g., 60)',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Loan tenure is required';
+                  }
+                  final v = int.tryParse(value.trim());
+                  if (v == null || v <= 0) {
+                    return 'Enter a valid positive integer';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 18),
+
+              // ✅ Calculate Button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _calculateEMI,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.indigo,
+                    foregroundColor: Colors.white, // ✅ white text
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: const Text(
+                    'Calculate EMI',
+                    style: TextStyle(fontSize: 16),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 20),
+
+              if (_emi != null && _totalInterest != null)
+                Card(
+                  elevation: 3,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Loan Amount: ${_loanController.text.trim()}',
+                            style: const TextStyle(fontSize: 16)),
+                        const SizedBox(height: 8),
+                        Text('EMI (monthly): ${_emi!.toStringAsFixed(2)}',
+                            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        Text('Total Interest: ${_totalInterest!.toStringAsFixed(2)}',
+                            style: const TextStyle(fontSize: 16)),
+                        const SizedBox(height: 8),
+                        Text('Total Payment: ${( _emi! * int.parse(_tenureController.text.trim())).toStringAsFixed(2)}',
+                            style: const TextStyle(fontSize: 14, color: Colors.grey)),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Helper extension for pow (keeps your existing implementation)
+extension DoublePow on double {
+  double pow(int exponent) {
+    double res = 1.0;
+    for (int i = 0; i < exponent; i++) {
+      res *= this;
+    }
+    return res;
+  }
+}
+
+/// --------------------------------
+/// Expense Manager (Exercise 5 - Q1)
+/// --------------------------------
+
+class ExpenseData {
+  final double income;
+  final double rent;
+  final double food;
+  final double transport;
+  final double others;
+
+  ExpenseData({
+    required this.income,
+    required this.rent,
+    required this.food,
+    required this.transport,
+    required this.others,
+  });
+
+  double get totalExpenses => rent + food + transport + others;
+  double get remainingBalance => income - totalExpenses;
+}
+
+class ExpenseFormPage extends StatefulWidget {
+  const ExpenseFormPage({super.key});
+
+  @override
+  State<ExpenseFormPage> createState() => _ExpenseFormPageState();
+}
+
+class _ExpenseFormPageState extends State<ExpenseFormPage> {
+  final _formKey = GlobalKey<FormState>();
+  final TextEditingController _incomeCtrl = TextEditingController();
+  final TextEditingController _rentCtrl = TextEditingController();
+  final TextEditingController _foodCtrl = TextEditingController();
+  final TextEditingController _transportCtrl = TextEditingController();
+  final TextEditingController _othersCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _incomeCtrl.dispose();
+    _rentCtrl.dispose();
+    _foodCtrl.dispose();
+    _transportCtrl.dispose();
+    _othersCtrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (!_formKey.currentState!.validate()) return;
+
+    final expense = ExpenseData(
+      income: double.parse(_incomeCtrl.text.trim()),
+      rent: double.parse(_rentCtrl.text.trim()),
+      food: double.parse(_foodCtrl.text.trim()),
+      transport: double.parse(_transportCtrl.text.trim()),
+      others: double.parse(_othersCtrl.text.trim()),
+    );
+
+    // Use named route and pass expense as arguments
+    Navigator.pushNamed(context, '/expenseResult', arguments: expense);
+  }
+
+  void _reset() {
+    _formKey.currentState!.reset();
+    _incomeCtrl.clear();
+    _rentCtrl.clear();
+    _foodCtrl.clear();
+    _transportCtrl.clear();
+    _othersCtrl.clear();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Monthly Budget Form'),
+        backgroundColor: Colors.green.shade700,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              // Monthly Income (must be positive)
+              TextFormField(
+                controller: _incomeCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Monthly Income',
+                  hintText: 'Enter monthly income (e.g., 30000)',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) return 'Income is required';
+                  final v = double.tryParse(value.trim());
+                  if (v == null || v <= 0) return 'Income must be a positive number';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+
+              // Rent / EMI
+              TextFormField(
+                controller: _rentCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Rent / EMI',
+                  hintText: 'Enter rent or EMI amount',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) return 'Rent/EMI is required';
+                  final v = double.tryParse(value.trim());
+                  if (v == null || v < 0) return 'Enter a valid number (>= 0)';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+
+              // Food Expenses
+              TextFormField(
+                controller: _foodCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Food Expenses',
+                  hintText: 'Enter food expenses',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) return 'Food expenses required';
+                  final v = double.tryParse(value.trim());
+                  if (v == null || v < 0) return 'Enter a valid number (>= 0)';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+
+              // Transport
+              TextFormField(
+                controller: _transportCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Transport Expenses',
+                  hintText: 'Enter transport expenses',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) return 'Transport expenses required';
+                  final v = double.tryParse(value.trim());
+                  if (v == null || v < 0) return 'Enter a valid number (>= 0)';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+
+              // Other expenses
+              TextFormField(
+                controller: _othersCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Other Expenses',
+                  hintText: 'Enter other monthly expenses',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) return 'Other expenses required';
+                  final v = double.tryParse(value.trim());
+                  if (v == null || v < 0) return 'Enter a valid number (>= 0)';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 18),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _submit,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green.shade700,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: const Text('Calculate Balance'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: _reset,
+                      child: const Text('Reset'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Result screen for Expense (Exercise 5 - Q1)
+class ExpenseResultPage extends StatelessWidget {
+  const ExpenseResultPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final args = ModalRoute.of(context)!.settings.arguments;
+    if (args == null || args is! ExpenseData) {
+      // If navigated without arguments, show a helpful message.
+      return Scaffold(
+        appBar: AppBar(title: const Text('Result'), backgroundColor: Colors.green.shade700),
+        body: const Center(child: Text('No data provided. Please submit the form first.')),
+      );
+    }
+
+    final ExpenseData data = args;
+    final double balance = data.remainingBalance;
+    final bool overspending = balance < 0;
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Budget Result'), backgroundColor: Colors.green.shade700),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Card(
+              elevation: 3,
+              child: ListTile(
+                title: const Text('Monthly Income'),
+                trailing: Text(data.income.toStringAsFixed(2)),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Card(
+              elevation: 2,
+              child: Column(
+                children: [
+                  ListTile(
+                    title: const Text('Rent / EMI'),
+                    trailing: Text(data.rent.toStringAsFixed(2)),
+                  ),
+                  const Divider(height: 0),
+                  ListTile(
+                    title: const Text('Food Expenses'),
+                    trailing: Text(data.food.toStringAsFixed(2)),
+                  ),
+                  const Divider(height: 0),
+                  ListTile(
+                    title: const Text('Transport Expenses'),
+                    trailing: Text(data.transport.toStringAsFixed(2)),
+                  ),
+                  const Divider(height: 0),
+                  ListTile(
+                    title: const Text('Other Expenses'),
+                    trailing: Text(data.others.toStringAsFixed(2)),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Card(
+              elevation: 4,
+              color: overspending ? Colors.red.shade50 : Colors.green.shade50,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Remaining Balance',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            balance.toStringAsFixed(2),
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                              color: overspending ? Colors.red : Colors.green,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      overspending ? Icons.warning : Icons.check_circle,
+                      color: overspending ? Colors.red : Colors.green,
+                      size: 36,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (overspending)
+              Text('You are overspending!', style: TextStyle(color: Colors.red.shade700, fontWeight: FontWeight.bold)),
+            if (!overspending)
+              Text('Great! You are within budget.', style: TextStyle(color: Colors.green.shade700, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () => Navigator.popUntil(context, ModalRoute.withName('/')),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
+              child: const Text('Back to Home'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
